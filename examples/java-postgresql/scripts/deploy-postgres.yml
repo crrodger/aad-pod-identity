@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-postgresql-deployment
+  namespace: postgres
+  labels:
+    aadpodidbinding: demo
+spec:
+  replicas: 10
+  minReadySeconds: 5
+  selector:
+    matchLabels:
+      name: demo-postgresql-deployment
+      app: demo-postgresql-deployment
+      aadpodidbinding: demo
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        name: demo-postgresql-deployment
+        app: demo-postgresql-deployment
+        aadpodidbinding: demo
+    spec:
+      containers:
+      - name: spring-boot-container
+        imagePullPolicy: Always
+        image: amlservicee22da533eb.azurecr.io/postgresmi:0.3
+        env:
+          - name: CLIENT_ID
+            value: "86ec546f-9940-48ea-bf65-c7cbfa10efcc"
+          - name: TENANT_ID
+            value: <INSERT_TENANT_ID_HERE>
+          - name: RUN_STARTUP_CODE
+            value: "true"
+          - name: ITERATIONS
+            value: "5000"
+          - name: "TOKEN_REFRESH_COUNT"
+            value: "1000"
+        ports:
+          - containerPort: 8080
+            name: http
+            protocol: TCP

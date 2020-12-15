@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-postgresql-
+  namespace: postgres
+spec:
+  type: LoadBalancer
+  selector:
+    name: demo-postgresql-deployment
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
