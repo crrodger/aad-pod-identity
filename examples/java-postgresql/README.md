@@ -1,9 +1,9 @@
 ---
-title: "Spring Boot + Azure Storage + AAD Pod Identity"
-linkTitle: "Spring Boot + Azure Storage + AAD Pod Identity"
+title: "Spring Boot + Azure Database for Postgres + AAD Pod Identity"
+linkTitle: "Spring Boot + Azure Database for Postgres + AAD Pod Identity"
 weight: 2
 description: >
-  Sample code and instructions demonstrating how you can access Azure Storage using a user-assigned identity with the aid of AAD Pod Identity from a spring boot application.
+  Sample code and instructions demonstrating how you can access Azure Database for PostgreSQL using a user-assigned identity with the aid of AAD Pod Identity from a spring boot application.
 
 ---
 
