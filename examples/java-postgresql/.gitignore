@@ -35,3 +35,4 @@ build/
 scripts/steps.txt
 scripts/deployment.yml
 scripts/azureidentity.yml
+scripts/vars.sed
