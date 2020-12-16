@@ -6,7 +6,7 @@ metadata:
   labels:
     aadpodidbinding: demo
 spec:
-  replicas: 10
+  replicas: 1
   minReadySeconds: 5
   selector:
     matchLabels:
@@ -31,15 +31,23 @@ spec:
         image: amlservicee22da533eb.azurecr.io/postgresmi:0.3
         env:
           - name: CLIENT_ID
-            value: "86ec546f-9940-48ea-bf65-c7cbfa10efcc"
+            value: "<INSERT_CLIENT_ID_HERE>"
           - name: TENANT_ID
-            value: <INSERT_TENANT_ID_HERE>
+            value: "<INSERT_TENANT_ID_HERE>"
+          - name: CONNECT_STRING
+            value: "<INSERT_CONNECTION_STRING_HERE>"
+          - name: DB_USERNAME
+            value: "<INSERT_DATABASE_USERNAME_HERE>"
+          - name: DB_DATABASE
+            value: "<INSERT_DATABASENAME_HERE>"
+          - name: DB_TABLE
+            value: "<INSERT_DATABASE_TABLE_NAME_HERE>"
           - name: RUN_STARTUP_CODE
             value: "true"
           - name: ITERATIONS
-            value: "5000"
+            value: "500"
           - name: "TOKEN_REFRESH_COUNT"
-            value: "1000"
+            value: "50"
         ports:
           - containerPort: 8080
             name: http

@@ -35,33 +35,51 @@ There are two main parts to the application
 The application was written for a specific purpose so the functionality may look a little odd for a sample application. This is due to the intended purpose for which this sample was initially developed being to test token retrieval in different scenarios.
 
 1. Kubernetes (AKS was used for this sample) - the application will only run correctly if deployed into a Kubernetes cluster with AAD Pod Identity installed
-2. AAD Pod Identity deployed and configured in the cluster (including creating a Managed Identity either with the cli or in the portal)
-3. Docker on the development machine - the image is built locally using a Dockerfile. This helps with making sure the version of Java used is consistent when deployed to the cluster.
-4. An Azure Container Registry (ACR) instance that can be access from the developer machine and the Kubernetes cluster. The code is compiled using a 'docker build' command and the pushed to ACR. The Kubernetes cluster will pull the image from that ACR
-5. A Managed Identity setup in Azure that is available to the VM Scale Set on which AKS is running
-6. An Azure Database for PostgreSQL instance setup and configured to enable Managed Identity connections [see documentation here](https://docs.microsoft.com/en-us/azure/postgresql/howto-connect-with-managed-identity)
+2. kubectl access to the cluster
+3. AAD Pod Identity deployed and configured in the cluster (including creating a Managed Identity either with the cli or in the portal)
+4. Docker on the development machine - the image is built locally using a Dockerfile. This helps with making sure the version of Java used is consistent when deployed to the cluster.
+5. An Azure Container Registry (ACR) instance that can be access from the developer machine and the Kubernetes cluster. The code is compiled using a 'docker build' command and the pushed to ACR. The Kubernetes cluster will pull the image from that ACR
+6. A Managed Identity setup in Azure that is available to the VM Scale Set on which AKS is running
+7. An Azure Database for PostgreSQL instance setup and configured to enable Managed Identity connections [see documentation here](https://docs.microsoft.com/en-us/azure/postgresql/howto-connect-with-managed-identity)
 
 ### Setup steps
 
 1. Clone the repository to a local folder
 
-2. Update the deployment variables in the deploy-postgres.yml file (see instructions below)
+2. Create a table in Postgres to insert test records into
 
-3. Ensure Docker is running locally to run the build
+3. ```sql
+   CREATE TABLE public.logs
+   (
+       message character varying(255) COLLATE pg_catalog."default",
+       "time" timestamp with time zone
+   )
+   ```
 
-4. Build the Docker image in a terminal located in the source code root folder, using
+4. Create a namespace in AKS. The yml files in this sample assume the namespace is called postgres, change them if desired (change all references in azureidentity-postgres.yml, azureidentitybinding.yml, service-postgres.yml and deploy-postgres.yml)
+
+5. Apply the yml config as follows
+   
+   ```bash
+   kubectl apply -f ./scripts/azureidentity-postgres.yml
+   kubectl apply -f ./scripts/azureidentitybinding.yml
+   ```
+
+4. Ensure Docker is running locally to run the build
+
+5. Build the Docker image in a terminal located in the source code root folder, using
    
    ```
    docker build -t <acr_service_name>/<repository>:<tag> -f ./Dockerfile .
    ```
 
-5. Push the Docker image to the ACR repository (you may need to login to ACR first)
+6. Push the Docker image to the ACR repository (you may need to login to ACR first)
    
    ```
    docker push <acr_service_name>/<repository>:<tag>
    ```
 
-6. Ensure the deployment file deploy-postgres.yml is configured correctly.
+7. Ensure the deployment file deploy-postgres.yml is configured correctly.
    Important elements are
    
    ```yml
@@ -78,24 +96,32 @@ The application was written for a specific purpose so the functionality may look
           value: "<INSERT_CONNECTION_STRING_HERE>"
         - name: DB_USERNAME
           value: "<INSERT_DATABASE_USERNAME_HERE>"
+        - name: DB_DATABASE
+          value: "<INSERT_DATABASENAME_HERE>"
+        - name: DB_TABLE
+          value: "<INSERT_DATABASE_TABLE_NAME_HERE>"
         - name: RUN_STARTUP_CODE
           value: "true"
         - name: ITERATIONS
-          value: "5000"
+          value: "500"
         - name: "TOKEN_REFRESH_COUNT"
-          value: "1000"
+          value: "50"
    ```
    
    The env section shown above determines how and if the startup code is executed
    
    ```textile
-   CLIENT_ID is the client ID retreived from creating the Managed Identity that will be used
+   LIENT_ID is the client ID retreived from creating the Managed Identity that will be used
    TENANT_ID is your subscription tenant id (can be obtained from the Azure Portal)
-   CONNECT_STRING the PostgreSQL connection string. It should include a paramer option for the databasename, username and password (%s). The Java code will complete 
+   CONNECT_STRING the PostgreSQL connection string. It should include a Java parameters for the databasename, username and password (%s). The Java code will complete 
    this using the other environment variables defined from the above YAML fragment
+   DB_USERNAME is the username configured in PostgreSQL with a Managed Identity
+   DB_DATABASE is the name of the database into which records will be inserted
+   DB_TABLE is the name of the table into which records will be inserted (it must have the structure explained above)
+   
    ```
    
-   An example connection string - change ""your_database_resource_name""
+   An example connection string - change "your_database_resource_name"
    
    ```java
    jdbc:postgresql://your_database_resource_name.postgres.database.azure.com:5432/%s?user=%s&password=%s&sslmode=require
@@ -118,6 +144,17 @@ If you have more than 1 pod deployed (replicas > 1) it will not be practical to 
 ### Using
 
 The startup code option is dealt with in the above setup notes. This section outlines how to use the REST API endpoints.
+
+The IP address can be obtained using
+
+```bash
+kubectl get svc --all-namespaces
+
+NAMESPACE     NAME                             TYPE           CLUSTER-IP     EXTERNAL-IP     PORT(S)          AGE
+postgres      demo-postgresql                  LoadBalancer   10.0.234.103   20.53.192.110   8080:32194/TCP   36m
+```
+
+ and look for the EXTERNAL-IP. Access the endpoints from a browser using this IP address and port 8080
 
 These are the endpoints available from the application:
 
