@@ -3,7 +3,6 @@ package com.nabexample.postgresql.controller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.sql.Connection;
@@ -17,8 +16,6 @@ import com.azure.core.credential.AccessToken;
 import com.azure.core.credential.TokenRequestContext;
 import com.azure.identity.DefaultAzureCredential;
 import com.azure.identity.DefaultAzureCredentialBuilder;
-import com.azure.identity.ManagedIdentityCredential;
-import com.azure.identity.ManagedIdentityCredentialBuilder;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -26,18 +23,11 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 import java.io.*;
-import java.net.*;
 import com.fasterxml.jackson.core.*;
 
 /*
 Basic REST controller to respond to URL events and drive the application using that.
-URLs used are
-/ - basic usage information
-/connect - connect to a pre-decided Azure Database for PostgreSQL instance
-/save - save a record to a table in the database
-/info - show information about the connection and most recent update (for time tracking of the token and update)
-/hammer - run repeated token requests using a parameter for number of iterations using the Java SDK for Azure
-/hammertwo - run repeated token requests using a parameter for number of iterations using HTTP token request
+See the function getUsage() in this file for URLS available
 */
 @RestController
 public class RequestController {
@@ -56,7 +46,7 @@ public class RequestController {
     */
     @RequestMapping("/")
     public String index() {
-        return "Greetings from the index method";
+        return "The index location does not do anything (other than return this message), try /help to see usage guidance";
     }
 
     /*
@@ -67,18 +57,21 @@ public class RequestController {
     @RequestMapping("/connect")
     @ResponseStatus(HttpStatus.CREATED)
     public String connectToDatabase() {
-        String str_client_id = System.getenv("CLIENT_ID");
+        String strClientId = System.getenv("CLIENT_ID");
+        String dbConnectString = System.getenv("CONNECT_STRING"); //Connect string with substitution parameter embedded ...?user=%s...
+        String dbUsername = System.getenv("DB_USERNAME"); //Database username linked with Managed Identity to use to connect
+        String dbName = System.getenv("DB_DATABASE");
         StringBuilder sbRes = new StringBuilder();
         sbRes.append("Token creation log <br>");
 
         MSICredentials credsProvider = MSICredentials.getMSICredentials();
-        credsProvider.updateClientId(str_client_id);
+        credsProvider.updateClientId(strClientId);
         MSIToken token = null;
 
         if (this.msiToken != null) {
             sbRes.append("Token already initialised, will re-create/re-retrieve<br>");
         } else {
-            sbRes.append("Token has not been innitialised previously, creating...<br>");
+            sbRes.append("Token has not been initialised previously, creating...<br>");
         }
 
         try {
@@ -88,10 +81,14 @@ public class RequestController {
             this.msiToken = token;
             sbRes.append("Token value  " + this.token.substring(0, 5) + "..." + this.token.substring(this.token.length() - 6, this.token.length()) + " <br>");
             
+            logger.info("Connection string from env variable {}", dbConnectString);
+            logger.info("Database username from env variable {}", dbUsername);
+            logger.info("Database name from env variable {}", dbName);
             logger.info("Token retrieved {}", this.token);
 
-            String connectStr = String.format("jdbc:postgresql://aks-nab-pgsql.postgres.database.azure.com:5432/demodb?user=%s&password=%s&sslmode=require", "demouser@aks-nab-pgsql", this.token);
-            String redactConnectStr = String.format("jdbc:postgresql://aks-nab-pgsql.postgres.database.azure.com:5432/demodb?user=%s&password=%s&sslmode=require", "demouser@aks-nab-pgsql", this.token.substring(0, 5) + "..." + this.token.substring(this.token.length() - 6, this.token.length()));
+            String connectStr = String.format(dbConnectString, dbName, dbUsername, this.token);
+            String redactConnectStr = String.format(dbConnectString, dbName, dbUsername, this.token.substring(0, 5) + "..." + this.token.substring(this.token.length() - 6, this.token.length()));
+            logger.info("Completed connection string {}", connectStr);
             sbRes.append("Connection string : " + redactConnectStr + "<br>");
             
                 try {
@@ -114,10 +111,12 @@ public class RequestController {
     @GetMapping("/hammersdk")
     @ResponseBody
     public String maxRate(@RequestParam(name = "iters") String strIters) {
-        System.out.println("Hammer(SDK) with " + strIters + " iterations as parameter");
-        String str_client_id = System.getenv("CLIENT_ID");
-        String str_tenant_id = System.getenv("TENANT_ID");
+        logger.info("Hammer(SDK) with {} iterations as parameter", strIters);
+        String strClientId = System.getenv("CLIENT_ID");
+        String strTenantId = System.getenv("TENANT_ID");
+        String dbTable = System.getenv("DB_TABLE");
         StringBuilder sbRes = new StringBuilder();
+        String strInsert = "";
         long startTime = 0;
         long endTime = 0;
 
@@ -126,8 +125,8 @@ public class RequestController {
         sbRes.append("Will perform " + iterations + " loops, no feedback until completed<br>");
         if (iterations > 0) {
             DefaultAzureCredentialBuilder dacb = new DefaultAzureCredentialBuilder();
-            dacb.managedIdentityClientId(str_client_id);
-            dacb.tenantId(str_tenant_id);
+            dacb.managedIdentityClientId(strClientId);
+            dacb.tenantId(strTenantId);
             DefaultAzureCredential dac = dacb.build();
 
             TokenRequestContext trq = new TokenRequestContext();
@@ -136,10 +135,11 @@ public class RequestController {
             Mono<AccessToken> token = null;
 
             //Do first token to ensure on the machine before looping, to remove first retrieval delay
+            //The token is not actually used here, this is to test simply retrieving it and what the performance of that is like. The token is used only in the connectToDatabase method
             try {
                 token = dac.getToken(trq);
             } catch (Exception ex) {
-                sbRes.append("IOExcpetion getting first token " + ex.getMessage() + "<br>");
+                sbRes.append("IOException getting first token " + ex.getMessage() + "<br>");
                 return sbRes.toString();
             }
 
@@ -147,6 +147,9 @@ public class RequestController {
             for (int i=0; i<iterations; i++) {
                 try {
                     token = dac.getToken(trq);
+                    //The token is not actually used here, this is to test simply retrieving it and what the performance of that is like. The token is used only in the connectToDatabase method
+                    strInsert = "Insert record " + i + " of " + iterations;
+                    executeDatabaseInsert(strInsert, dbTable, sbRes);
                 } catch (Exception ex) {
                     sbRes.append("Exception getting token on iteration " + i + " with message" + ex.getMessage() + "<br>");
                     return sbRes.toString();
@@ -176,9 +179,11 @@ public class RequestController {
     @GetMapping("/hammersdkp")
     @ResponseBody
     public String maxRatep(@RequestParam(name = "iters") String strIters) {
-        System.out.println("Hammer(SDK Preview) with " + strIters + " iterations as parameter");
-        String str_client_id = System.getenv("CLIENT_ID");
+        logger.info("Hammer(SDK Preview) with {} iterations as parameter", strIters);
+        String strClientId = System.getenv("CLIENT_ID");
+        String dbTable = System.getenv("DB_TABLE");
         StringBuilder sbRes = new StringBuilder();
+        String strInsert = "";
         long startTime = 0;
         long endTime = 0;
 
@@ -187,10 +192,11 @@ public class RequestController {
         sbRes.append("Will perform " + iterations + " loops, no feedback until completed<br>");
         if (iterations > 0) {
             MSICredentials credsProvider = MSICredentials.getMSICredentials();
-            credsProvider.updateClientId(str_client_id);
+            credsProvider.updateClientId(strClientId);
             MSIToken token = null;
 
             //Do first token to ensure on the machine before looping, to remove first retrieval delay
+            //The token is not actually used here, this is to test simply retrieving it and what the performance of that is like. The token is used only in the connectToDatabase method
             try {
                 token = credsProvider.getToken("https://ossrdbms-aad.database.windows.net");
             } catch (Exception ex) {
@@ -201,7 +207,10 @@ public class RequestController {
             startTime = System.currentTimeMillis();
             for (int i=0; i<iterations; i++) {
                 try {
+                    //The token is not actually used here, this is to test simply retrieving it and what the performance of that is like. The token is used only in the connectToDatabase method
                     token = credsProvider.getToken("https://ossrdbms-aad.database.windows.net");
+                    strInsert = "HammerSDK Preview - Insert record " + i + " of " + iterations;
+                    executeDatabaseInsert(strInsert, dbTable, sbRes);
                 } catch (Exception ex) {
                     sbRes.append("Exception getting token on iteration " + i + " with message" + ex.getMessage() + "<br>");
                     return sbRes.toString();
@@ -264,8 +273,10 @@ public class RequestController {
     @GetMapping("/hammerhttp")
     @ResponseBody
     public String maxRateTwo(@RequestParam(name = "iters") String strIters) {
-        System.out.println("HammerTwo with " + strIters + " iterations as parameter");
+        logger.info("Hammerhttp with {} iterations as parameter",  strIters);
+        String dbTable = System.getenv("DB_TABLE");
         StringBuilder sbRes = new StringBuilder();
+        String strInsert = "";
         long startTime = 0;
         long endTime = 0;
 
@@ -287,8 +298,10 @@ public class RequestController {
             for (int i=0; i<iterations; i++) {
                 try {
                     token = getTokenWithHTTP();
+                    strInsert = "Hammer token with HTTP - Insert record " + i + " of " + iterations;
+                    executeDatabaseInsert(strInsert, dbTable, sbRes);
                 } catch (Exception ex) {
-                    sbRes.append("Excpetion getting token on iteration " + i + " with message" + ex.getMessage() + "<br>");
+                    sbRes.append("Exception getting token on iteration " + i + " with message" + ex.getMessage() + "<br>");
                     return sbRes.toString();
                 }
             }
@@ -306,40 +319,50 @@ public class RequestController {
         return sbRes.toString();
     }
 
+public int executeDatabaseInsert(String message, String dbTable, StringBuilder sbResMsg) {
+    Timestamp sqlTS = null;
+    int stmntRet = -1;
+
+    if (this.conn != null) {
+        try {
+            this.stmnt = this.conn.prepareStatement("INSERT INTO " + dbTable + " VALUES(?, ?)");
+            sqlTS = new Timestamp(System.currentTimeMillis());
+            stmnt.setObject(1, message, java.sql.Types.CHAR);
+            stmnt.setObject(2, sqlTS, java.sql.Types.TIMESTAMP);
+            stmntRet = stmnt.executeUpdate();
+            this.lastSaveTime = sqlTS;
+        } catch (SQLException sqlex) {
+            logger.error("SQL Exception error {}", sqlex);
+         } 
+    } else {
+        sbResMsg.append("Database is not connected yet, use /connect to initialise the connection <br>");
+    }
+
+    return stmntRet;
+}
+
     /*
     Save an arbitrary record to the database that includes a timestamp. 
     Used to check if the connection will remain open for long periods.
-
-    Tested up to 48 hours and the connection was usable the whole time.
     */
     @RequestMapping("/save")
     @ResponseStatus(HttpStatus.CREATED)
     public String createRecord() {
+        String dbTable = System.getenv("DB_TABLE");
         StringBuilder sbRes = new StringBuilder();
-        Timestamp sqlTS = null;
         int stmntRet = -1;
 
         sbRes.append("<br>");
+        logger.info("Saving single record to logs table");
 
-        if (this.conn != null) {
-            try {
-                this.stmnt = this.conn.prepareStatement("INSERT INTO logs VALUES('A message from save', ?)");
-                sqlTS = new Timestamp(System.currentTimeMillis());
-                stmnt.setObject(1, sqlTS, java.sql.Types.TIMESTAMP);
-                stmntRet = stmnt.executeUpdate();
-                this.lastSaveTime = sqlTS;
-            } catch (SQLException sqlex) {
-                System.out.println("SQL Exception error " + sqlex);
-                return "SQL Exception error " + sqlex;
-            } 
-        } else {
-            sbRes.append("Database is not connected yet, use /connect to initialise the connection <br>");
-        }
+        stmntRet = executeDatabaseInsert("Single insert from save endpoint", dbTable, sbRes);
 
-        if (sqlTS != null && stmntRet == 1) {
-            sbRes.append("Added record" + sqlTS + "<br>");
+        if (stmntRet == 1) {
+            sbRes.append("Added record <br>");
+            logger.info("Added single record with timestamp");
         } else {
-            sbRes.append("Something went wrong adding the record, statement returned" + stmntRet  + "perhaps the connection is either not active or has broken <br>");
+            sbRes.append("Something went wrong adding the record, statement returned " + stmntRet  + " perhaps the connection is either not active or has broken <br>");
+            logger.error("Could not insert single record, return from call was {}", stmntRet);
         }
 
         return sbRes.toString();
@@ -358,9 +381,9 @@ A kind of 'help call, when using the root url return the options that can be cal
         sbRes.append("/connect                        - create a connection to the PostgreSQL database. It is kept open indefinitely<br>");
         sbRes.append("/save                              - insert a record into the logs table with a message and timestamp (UTC) of the operation<br>");
         sbRes.append("/info                               - display information about the token, connection and last update time (UTC)<br>");
-        sbRes.append("/hammersdk?iters=n          - loop through n iterations of retriving a token using stable Azure Java SDK ()<br>");
-        sbRes.append("/hammersdkp?iters=n        - loop through n iterations of retriving a token using  preview 1.10 Azure Java SDK ()<br>");
-        sbRes.append("/hammerhttp?iters=n    - loop through n iterations of retriving a token using HTTP connection<br>");
+        sbRes.append("/hammersdk?iters=n          - loop through n iterations of retrieving a token using stable Azure Java SDK ()<br>");
+        sbRes.append("/hammersdkp?iters=n        - loop through n iterations of retrieving a token using  preview 1.10 Azure Java SDK ()<br>");
+        sbRes.append("/hammerhttp?iters=n    - loop through n iterations of retrieving a token using HTTP connection<br>");
         sbRes.append("<br>");
         sbRes.append("<br>");
         return sbRes.toString();
@@ -380,7 +403,7 @@ A kind of 'help call, when using the root url return the options that can be cal
         sbRes.append("<br>");
 
         if (this.conn == null) {
-            sbRes.append("Connection is not initialised, use /connect to iintialise it <br>");
+            sbRes.append("Connection is not initialised, use /connect to intialise it <br>");
         } else {
             sbRes.append("Connection is initialised <br>");
             try {
