@@ -34,7 +34,7 @@ There are two main parts to the application
 
 The application was written for a specific purpose so the functionality may look a little odd for a sample application. This is due to the intended purpose for which this sample was initially developed being to test token retrieval in different scenarios.
 
-1. Kubernetes (AKS was used for this sample) - the application will only run correctly if deployed into a Kubernetes cluster with AAD Pod Identity installed
+1. Kubernetes (AKS was used for this sample) - the application will only run correctly if deployed into a Kubernetes cluster with AAD Pod Identity installed. The cluster this was tested on also had a load balancer configured to provide an externally accessible IP address. If not using a load balancer then REST commands using wget would have to be run from inside a pod in the cluster.
 2. kubectl access to the cluster
 3. AAD Pod Identity deployed and configured in the cluster (including creating a Managed Identity either with the cli or in the portal)
 4. Docker on the development machine - the image is built locally using a Dockerfile. This helps with making sure the version of Java used is consistent when deployed to the cluster.
@@ -65,8 +65,6 @@ The application was written for a specific purpose so the functionality may look
    ```bash
    kubectl create namespace <NAMESPACE>
    ```
-   
-   
 
 5. Update the yml config to reflect the environment the app will be running in. The following variables in the config files will need values.
    
@@ -81,8 +79,6 @@ The application was written for a specific purpose so the functionality may look
    <INSERT_DATABASENAME_HERE>
    <INSERT_DATABASE_TABLE_NAME_HERE>
    ```
-   
-   
 
 6. Apply the config to the cluster
    
