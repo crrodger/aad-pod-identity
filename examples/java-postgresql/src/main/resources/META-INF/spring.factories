@@ -1,1 +1,1 @@
-org.springframework.boot.env.EnvironmentPostProcessor=com.nabexample.postgresql.config.postgres.PostgresConfigLoader
+org.springframework.boot.env.EnvironmentPostProcessor=com.pgexample.postgresql.config.postgres.PostgresConfigLoader
