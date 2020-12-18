@@ -1,4 +1,4 @@
-package com.nabexample.postgresql.controller;
+package com.pgexample.postgresql.controller;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
