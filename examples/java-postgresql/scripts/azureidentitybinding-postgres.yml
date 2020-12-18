@@ -2,7 +2,7 @@ apiVersion: "aadpodidentity.k8s.io/v1"
 kind: AzureIdentityBinding
 metadata:
   name: demo-identity-binding
-  namespace: postgres
+  namespace: <INSERT_NAMESPACE_HERE>
 spec: 
-  azureIdentity: demo-identity
+  azureIdentity: <INSERT_IDENTITY_NAME_HERE>
   selector: demo

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: demo-postgresql
-  namespace: postgres
+  namespace: <INSERT_NAMESPACE_HERE>
 spec:
   type: LoadBalancer
   selector:

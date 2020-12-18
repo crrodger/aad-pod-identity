@@ -1,11 +1,11 @@
 apiVersion: "aadpodidentity.k8s.io/v1"
 kind: AzureIdentity
 metadata:
-  name: demo-identity
-  namespace: postgres
+  name: <INSERT_IDENTITY_NAME_HERE>
+  namespace: <INSERT_NAMESPACE_HERE>
   annotations: 
     aadpodidentity.k8s.io/Behavior: namespaced
 spec:
   type: 0 # Azure ID (1 is SP)
-  resourceID: /subscriptions/72398b55-518d-42fc-a448-a904194785b8/resourceGroups/MC_aks-nab_aks-nab_australiaeast/providers/Microsoft.ManagedIdentity/userAssignedIdentities/demo-identity
-  clientID: 86ec546f-9940-48ea-bf65-c7cbfa10efcc
+  resourceID: <INSERT_RESOURCE_ID_HERE>
+  clientID: <INSERT_CLIENT_ID_HERE>
